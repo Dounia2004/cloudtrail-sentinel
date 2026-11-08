@@ -1,0 +1,11 @@
+# Remplacer par les vrais noms d'utilisateur GitHub
+/src/ingestion/   @UTILISATEUR_A
+/src/storage/     @UTILISATEUR_A
+/src/detection/rules/ @UTILISATEUR_A
+/src/api/         @UTILISATEUR_A
+/data/            @UTILISATEUR_A
+/src/detection/ml/ @UTILISATEUR_B
+/src/scoring/     @UTILISATEUR_B
+/src/evaluation/  @UTILISATEUR_B
+/src/dashboard/   @UTILISATEUR_B
+/src/agent/       @UTILISATEUR_B

@@ -1,0 +1,19 @@
+# Cœur du projet (Python 3.11)
+pydantic>=2.6
+pandas>=2.2
+numpy>=1.26
+scikit-learn>=1.4
+fastapi>=0.110
+uvicorn>=0.29
+streamlit>=1.32
+plotly>=5.20
+python-dotenv>=1.0
+
+# Qualité
+pytest>=8.0
+ruff>=0.4
+pre-commit>=3.7
+
+# Optionnel, à ajouter en semaine 7 :
+# langgraph
+# ollama
