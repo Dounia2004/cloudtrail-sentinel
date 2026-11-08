@@ -19,6 +19,7 @@ Ces trois contrats permettent de travailler en parallèle. Tout changement se di
 | `user_agent` | TEXT | Agent utilisateur |
 | `mfa_used` | INTEGER | 1, 0 ou NULL si non applicable |
 | `error_code` | TEXT | NULL si succès |
+| `login_result` | TEXT | `Success` ou `Failure` pour les connexions console, sinon NULL |
 | `request_params` | TEXT | JSON sérialisé |
 | `scenario` | TEXT | Étiquette du scénario (données synthétiques) |
 | `is_attack` | INTEGER | 1 si événement d'attaque, sinon 0 |
