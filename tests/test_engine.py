@@ -1,25 +1,23 @@
-from pathlib import Path
-
 from src.detection.engine import run_rules
-from src.ingestion.models import load_events
-
-FIXTURES = Path(__file__).parent / "fixtures"
 
 
-def load_fixture_events():
-    events, _ = load_events(
-        FIXTURES / "cloudtrail_sample.json", FIXTURES / "labels_sample.csv"
-    )
-    return events
+def test_run_rules_finds_expected_rules_in_fixtures(fixture_events):
+    alerts = run_rules(fixture_events)
+    assert {alert.rule_id for alert in alerts} == {"IAM-001", "IAM-004", "IAM-005", "LOG-001"}
+    assert len(alerts) == 6
 
 
-def test_run_rules_finds_alerts_in_fixtures():
-    alerts = run_rules(load_fixture_events())
-    assert len(alerts) >= 1
-    assert {alert.rule_id for alert in alerts} <= {"IAM-001"}
-
-
-def test_alerts_are_sorted_by_time():
-    alerts = run_rules(load_fixture_events())
-    times = [alert.first_seen for alert in alerts]
+def test_alerts_are_sorted_by_time(fixture_events):
+    times = [alert.first_seen for alert in run_rules(fixture_events)]
     assert times == sorted(times)
+
+
+def test_no_alert_on_normal_activity(fixture_events):
+    normal = [e for e in fixture_events if e.scenario == "normal"]
+    assert run_rules(normal) == []
+
+
+def test_every_alert_points_to_a_real_attack(fixture_events):
+    by_id = {e.event_id: e for e in fixture_events}
+    for alert in run_rules(fixture_events):
+        assert all(by_id[event_id].is_attack == 1 for event_id in alert.event_ids)
