@@ -1,10 +1,14 @@
 from src.detection.engine import run_rules
 
+EXPECTED_RULES = {
+    "IAM-001", "IAM-004", "IAM-005", "IAM-006", "LOG-001", "AUTH-002", "S3-001",
+}
+
 
 def test_run_rules_finds_expected_rules_in_fixtures(fixture_events):
     alerts = run_rules(fixture_events)
-    assert {alert.rule_id for alert in alerts} == {"IAM-001", "IAM-004", "IAM-005", "LOG-001"}
-    assert len(alerts) == 6
+    assert {alert.rule_id for alert in alerts} == EXPECTED_RULES
+    assert len(alerts) == 9
 
 
 def test_alerts_are_sorted_by_time(fixture_events):
