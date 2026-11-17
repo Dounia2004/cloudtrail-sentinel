@@ -4,7 +4,10 @@ Une règle = un module qui définit RULE_ID, MITRE, SEVERITY et une fonction
 detect(events) -> list[Alert]. Pour ajouter une règle : créer le module, puis l'ajouter à RULES.
 """
 from src.detection.rules import (
+    auth_001,
     auth_002,
+    auth_003,
+    auth_004,
     iam_001,
     iam_002,
     iam_003,
@@ -15,4 +18,17 @@ from src.detection.rules import (
     s3_001,
 )
 
-RULES = [iam_001, iam_002, iam_003, iam_004, iam_005, iam_006, log_001, auth_002, s3_001]
+RULES = [
+    iam_001,
+    iam_002,
+    iam_003,
+    iam_004,
+    iam_005,
+    iam_006,
+    log_001,
+    auth_001,
+    auth_002,
+    auth_003,
+    auth_004,
+    s3_001,
+]
