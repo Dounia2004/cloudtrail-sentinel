@@ -26,3 +26,4 @@ models/*.joblib
 .idea/
 .DS_Store
 Thumbs.db
+data/generated_*/
