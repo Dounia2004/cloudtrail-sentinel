@@ -27,3 +27,5 @@ models/*.joblib
 .DS_Store
 Thumbs.db
 data/generated_*/
+
+models/
