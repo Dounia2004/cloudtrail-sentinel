@@ -103,7 +103,7 @@ def build_features(events: list[Event], window: str = "1h") -> pd.DataFrame:
     features = features.rename(columns={"identity_name": "identity"})
     features["error_rate"] = features["n_errors"] / features["n_events"]
     features["hour"] = features["window_start"].dt.hour
-    features["is_weekend"] = (features["window_start"].dt.dayofweek >= 5).astype(int)
+    features["is_weekend"] = (features["window_start"].dt.day_of_week >= 5).astype(int)
     features["is_attack"] = (features["n_attack_events"] > 0).astype(int)
 
     # Scénario dominant de la fenêtre : attaque d'abord, sinon anomalie bénigne, sinon normal.
