@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from src.detection.ml.features import FEATURE_COLUMNS
 from src.detection.ml.split import IDENTITY_COL, LABEL_COL, SCENARIO_COL
 from src.detection.ml.train import (
     Params,
@@ -18,31 +19,25 @@ def _df(seed: int = 0) -> pd.DataFrame:
     rng = np.random.default_rng(seed)
     rows = []
     for i in range(80):
-        rows.append(
-            {
-                IDENTITY_COL: f"user{i}",
-                SCENARIO_COL: "normal",
-                LABEL_COL: 0,
-                "iam_calls": rng.poisson(3),
-                "error_rate": rng.uniform(0, 0.1),
-            }
-        )
+        row = {c: float(rng.poisson(3)) for c in FEATURE_COLUMNS}
+        row["error_rate"] = rng.uniform(0, 0.1)
+        row.update({IDENTITY_COL: f"user{i}", SCENARIO_COL: "normal", LABEL_COL: 0})
+        rows.append(row)
     for i in range(10):
-        rows.append(
-            {
-                IDENTITY_COL: f"atk{i}",
-                SCENARIO_COL: "privilege_escalation",
-                LABEL_COL: 1,
-                "iam_calls": rng.poisson(40),
-                "error_rate": rng.uniform(0.5, 0.9),
-            }
+        row = {c: float(rng.poisson(3)) for c in FEATURE_COLUMNS}
+        row["n_iam_write"] = float(rng.poisson(30))
+        row["error_rate"] = rng.uniform(0.5, 0.9)
+        row.update(
+            {IDENTITY_COL: f"atk{i}", SCENARIO_COL: "privilege_escalation", LABEL_COL: 1}
         )
+        rows.append(row)
     return pd.DataFrame(rows)
 
 
-def test_feature_columns_excludes_metadata():
+def test_feature_columns_excludes_labels():
     cols = feature_columns(_df())
-    assert set(cols) == {"iam_calls", "error_rate"}
+    assert cols == list(FEATURE_COLUMNS)
+    assert not {"is_attack", "scenario", "n_attack_events", "identity"} & set(cols)
 
 
 def test_scores_between_0_and_1():

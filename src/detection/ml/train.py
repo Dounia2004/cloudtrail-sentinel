@@ -20,16 +20,17 @@ from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
+from src.detection.ml.features import FEATURE_COLUMNS
 from src.detection.ml.split import (
     IDENTITY_COL,
     LABEL_COL,
     SCENARIO_COL,
     SEED,
+    UNSEEN_SCENARIO,
     split_by_identity,
 )
 
 MODEL_DIR = Path("models")
-META_COLS = {IDENTITY_COL, LABEL_COL, SCENARIO_COL, "window_start", "window_end"}
 
 PARAM_GRID = {
     "n_estimators": [100, 200],
@@ -55,10 +56,9 @@ class Model:
     params: Params
 
 
-def feature_columns(df: pd.DataFrame) -> list[str]:
-    """Toutes les colonnes numériques qui ne sont pas des métadonnées."""
-    numeric = df.select_dtypes(include="number").columns
-    return [c for c in numeric if c not in META_COLS]
+def feature_columns(df: pd.DataFrame | None = None) -> list[str]:
+    """Les features définies dans features.py (jamais les colonnes d'étiquette)."""
+    return list(FEATURE_COLUMNS)
 
 
 def _build_pipeline(p: Params) -> Pipeline:
@@ -167,10 +167,11 @@ def main() -> None:
     ap = argparse.ArgumentParser(description="Entraîne l'Isolation Forest.")
     ap.add_argument("--input", type=Path, required=True, help="features .csv/.parquet")
     ap.add_argument("--no-tune", action="store_true")
+    ap.add_argument("--unseen", default=UNSEEN_SCENARIO, help="scénario réservé au test")
     args = ap.parse_args()
 
     df = _read(args.input)
-    split = split_by_identity(df)
+    split = split_by_identity(df, args.unseen)
     params = Params() if args.no_tune else tune(split.train)
     model = train(split.train, params)
     path = save(model)
@@ -180,6 +181,12 @@ def main() -> None:
     print(f"Paramètres : {params}")
     print(f"Modèle sauvegardé : {path}")
     print(f"F1 sur le test (indicatif, détail en S5) : {f1:.3f}")
+    attacks = split.test[split.test[LABEL_COL] == 1]
+    flagged = test_pred.loc[attacks.index].groupby(attacks[SCENARIO_COL]).mean()
+    print("\nPart des fenêtres d'attaque détectées, par scénario :")
+    for scen, rate in flagged.items():
+        mark = "  <- non vu à l'entraînement" if scen == args.unseen else ""
+        print(f"  {scen:<28} {rate:.0%}{mark}")
 
 
 if __name__ == "__main__":

@@ -14,9 +14,13 @@ def _df():
     for i in range(40):
         rows.append({IDENTITY_COL: f"user{i}", SCENARIO_COL: "normal", LABEL_COL: 0})
     for i in range(10):
-        rows.append({IDENTITY_COL: f"atk{i}", SCENARIO_COL: "privilege_escalation", LABEL_COL: 1})
+        rows.append(
+            {IDENTITY_COL: f"atk{i}", SCENARIO_COL: "privilege_escalation", LABEL_COL: 1}
+        )
     for i in range(5):
-        rows.append({IDENTITY_COL: f"key{i}", SCENARIO_COL: "access_key_persistence", LABEL_COL: 1})
+        rows.append(
+            {IDENTITY_COL: f"key{i}", SCENARIO_COL: "access_key_persistence", LABEL_COL: 1}
+        )
     return pd.DataFrame(rows)
 
 
