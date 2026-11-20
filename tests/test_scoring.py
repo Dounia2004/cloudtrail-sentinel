@@ -32,9 +32,20 @@ def test_rule_only_keeps_rule_score():
     assert s["risk_score"].tolist() == [0, 70, 0]
 
 
-def test_ml_only_scales_to_100():
-    s = window_scores(_windows(), [], _ml([0.0, 0.8, 0.2]))
+def test_ml_only_scales_to_100_without_cap():
+    s = window_scores(_windows(), [], _ml([0.0, 0.8, 0.2]), ml_only_cap=100)
     assert s["risk_score"].tolist() == [0, 80, 20]
+
+
+def test_ml_only_is_capped_by_default():
+    s = window_scores(_windows(), [], _ml([0.0, 1.0, 0.2]))
+    assert s["risk_score"].tolist() == [0, 59, 20]
+
+
+def test_rule_alert_outranks_ml_only():
+    a = FakeAlert("alice", "IAM-001", "2026-11-10T10:10:00Z", "2026-11-10T10:20:00Z", score=70)
+    s = window_scores(_windows(), [a], _ml([1.0, 0.0, 0.0]))
+    assert s.loc[1, "risk_score"] == 70 and s.loc[0, "risk_score"] == 59
 
 
 def test_rule_plus_ml_gets_bonus_and_cap():
@@ -59,6 +70,13 @@ def test_build_alerts_sources_and_ids():
     assert sources["ML-IF"] == "ml"
     assert [x["alert_id"] for x in alerts] == ["a-0001", "a-0002"]
     assert {"identity", "score", "event_ids", "first_seen", "last_seen"} <= set(alerts[0])
+
+
+def test_ml_threshold_controls_ml_only_alerts():
+    s = window_scores(_windows(), [], _ml([0.0, 0.6, 0.0]), ml_threshold=70)
+    assert build_alerts([], s, ml_threshold=70) == []
+    s = window_scores(_windows(), [], _ml([0.0, 0.6, 0.0]), ml_threshold=50)
+    assert [a["detection_source"] for a in build_alerts([], s, ml_threshold=50)] == ["ml"]
 
 
 def test_severity_levels():
