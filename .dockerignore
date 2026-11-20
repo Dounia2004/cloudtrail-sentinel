@@ -1,0 +1,16 @@
+.git
+.github
+.venv
+.venv-ci
+__pycache__
+*.pyc
+.pytest_cache
+.ruff_cache
+.vscode
+.env
+models
+data/generated
+data/generated_*
+data/output
+data/*.db
+*.db
