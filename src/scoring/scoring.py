@@ -2,6 +2,7 @@
 
 Règle de calcul (simple et explicable en soutenance) :
   - score de base = max(score de la meilleure règle, score ML x 100)
+    (sans règle, le score ML seul est plafonné à ML_ONLY_CAP : une règle prime toujours)
   - +10 si une règle ET le ML signalent la même fenêtre (confirmation croisée)
   - +5 par règle distincte supplémentaire sur la fenêtre (plafonné à +15)
   - résultat borné à 100
@@ -27,6 +28,7 @@ from src.ingestion.models import load_events
 from src.scoring.correlation import correlate
 
 ML_THRESHOLD = 50  # score ML (0-100) à partir duquel une fenêtre est signalée
+ML_ONLY_CAP = 59  # une fenêtre signalée par le ML seul ne dépasse jamais ce score (« moyenne »)
 BOTH_BONUS = 10
 EXTRA_RULE_BONUS = 5
 EXTRA_RULE_CAP = 15
@@ -51,7 +53,12 @@ def _safe(alert: object, field: str, default: object) -> object:
 
 
 def window_scores(
-    windows: pd.DataFrame, alerts: list, ml_scores: pd.Series, window: str = "1h"
+    windows: pd.DataFrame,
+    alerts: list,
+    ml_scores: pd.Series,
+    window: str = "1h",
+    ml_threshold: int = ML_THRESHOLD,
+    ml_only_cap: int = ML_ONLY_CAP,
 ) -> pd.DataFrame:
     """Une ligne par fenêtre avec score règles, score ML et score de risque final."""
     by_key: dict[tuple, dict[str, float]] = {}
@@ -67,8 +74,8 @@ def window_scores(
         rules = by_key.get((ident, start), {})
         rule_score = max(rules.values(), default=0.0)
         ml = float(ml_scores.loc[idx]) * 100
-        risk = max(rule_score, ml)
-        if rules and ml >= ML_THRESHOLD:
+        risk = max(rule_score, ml) if rules else min(ml, ml_only_cap)
+        if rules and ml >= ml_threshold:
             risk += BOTH_BONUS
         risk += min(EXTRA_RULE_BONUS * max(len(rules) - 1, 0), EXTRA_RULE_CAP)
         rows.append(
@@ -85,7 +92,9 @@ def window_scores(
     return pd.DataFrame(rows, index=windows.index)
 
 
-def build_alerts(alerts: list, scores: pd.DataFrame, window: str = "1h") -> list[dict]:
+def build_alerts(
+    alerts: list, scores: pd.DataFrame, window: str = "1h", ml_threshold: int = ML_THRESHOLD
+) -> list[dict]:
     """Alertes au format `docs/contracts.md` (rule, ml ou combined), triées par date."""
     lookup = {(r.identity, r.window_start): r for r in scores.itertuples()}
     out: list[dict] = []
@@ -93,7 +102,7 @@ def build_alerts(alerts: list, scores: pd.DataFrame, window: str = "1h") -> list
         rows = [lookup[k] for k in _covered_keys(alert, window) if k in lookup]
         base = float(_safe(alert, "score", 50))
         score = max([base, *[r.risk_score for r in rows]])
-        combined = any(r.ml_score >= ML_THRESHOLD for r in rows)
+        combined = any(r.ml_score >= ml_threshold for r in rows)
         out.append(
             {
                 "identity": _get(alert, "identity"),
@@ -107,7 +116,7 @@ def build_alerts(alerts: list, scores: pd.DataFrame, window: str = "1h") -> list
                 "description": str(_safe(alert, "description", "")),
             }
         )
-    ml_only = scores[(scores["ml_score"] >= ML_THRESHOLD) & (scores["n_rules"] == 0)]
+    ml_only = scores[(scores["ml_score"] >= ml_threshold) & (scores["n_rules"] == 0)]
     for r in ml_only.itertuples():
         end = r.window_start + pd.Timedelta(window)
         out.append(
@@ -135,6 +144,12 @@ def main() -> None:
     ap.add_argument("--labels", default="data/generated_ml/labels.csv")
     ap.add_argument("--window", default="1h")
     ap.add_argument("--unseen", default=UNSEEN_SCENARIO)
+    ap.add_argument(
+        "--ml-threshold", type=int, default=ML_THRESHOLD, help="score ML minimal (0-100)"
+    )
+    ap.add_argument(
+        "--ml-only-cap", type=int, default=ML_ONLY_CAP, help="score max d'une alerte ML seule"
+    )
     ap.add_argument("--out", type=Path, default=Path("data/output"))
     args = ap.parse_args()
 
@@ -145,8 +160,10 @@ def main() -> None:
     model = train(split.train, Params())
     ml = score_windows(model, features)
 
-    scores = window_scores(features, alerts, ml, args.window)
-    final = build_alerts(alerts, scores, args.window)
+    scores = window_scores(
+        features, alerts, ml, args.window, args.ml_threshold, args.ml_only_cap
+    )
+    final = build_alerts(alerts, scores, args.window, args.ml_threshold)
     incidents = correlate(final)
 
     args.out.mkdir(parents=True, exist_ok=True)
@@ -163,6 +180,11 @@ def main() -> None:
     is_test = features["identity"].isin(set(split.test["identity"]))
     y_true = features.loc[is_test, LABEL_COL]
     print(f"{len(final)} alertes, {len(incidents)} incidents -> {args.out}")
+    by_source = pd.Series([a["detection_source"] for a in final]).value_counts()
+    print(
+        f"Alertes par source (seuil ML = {args.ml_threshold}, plafond ML seul = "
+        f"{args.ml_only_cap}) : {by_source.to_dict()}"
+    )
     print(f"\nÉvaluation du score sur le test ({int(is_test.sum())} fenêtres) :")
     for threshold in (30, 50, 70):
         m = compute_metrics(y_true, (scores.loc[is_test, "risk_score"] >= threshold).astype(int))
