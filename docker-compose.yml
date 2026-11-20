@@ -1,0 +1,67 @@
+# Démarrage : docker compose up --build
+#   API       -> http://localhost:8000/docs
+#   Dashboard -> http://localhost:8501
+# Rejeu de démonstration : docker compose --profile demo up replay
+name: cloudtrail-sentinel
+
+x-app: &app
+  build: .
+  image: cloudtrail-sentinel:latest
+  volumes:
+    - sentinel-data:/app/data
+
+x-env: &env
+  DATABASE_URL: sqlite:///data/sentinel.db
+  SENTINEL_OUTPUT_DIR: data/output
+
+services:
+  # Étape unique : génère les logs synthétiques, remplit SQLite, calcule scores et alertes.
+  bootstrap:
+    <<: *app
+    command: python scripts/bootstrap.py
+    environment:
+      <<: *env
+
+  api:
+    <<: *app
+    command: uvicorn src.api.main:app --host 0.0.0.0 --port 8000
+    environment:
+      <<: *env
+    depends_on:
+      bootstrap:
+        condition: service_completed_successfully
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  dashboard:
+    <<: *app
+    command: >
+      streamlit run src/dashboard/app.py
+      --server.address 0.0.0.0 --server.port 8501
+      --server.headless true --browser.gatherUsageStats false
+    environment:
+      SENTINEL_API: http://api:8000
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "8501:8501"
+
+  # Optionnel : republie les alertes une par une (voir src/api/replay.py).
+  replay:
+    <<: *app
+    profiles: ["demo"]
+    command: python -m src.api.replay --speed 20000 --max-delay 0.5
+    environment:
+      <<: *env
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  sentinel-data:

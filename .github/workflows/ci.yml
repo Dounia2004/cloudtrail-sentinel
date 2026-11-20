@@ -3,6 +3,7 @@ on:
   push:
     branches: [main]
   pull_request:
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -11,6 +12,38 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
       - run: pip install -r requirements.txt
       - run: ruff check .
       - run: pytest
+      - name: Audit du dépôt (IP, comptes, clés, licences)
+        run: python scripts/audit_repo.py
+
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  docker:
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build et démarrage (bootstrap -> API)
+        run: docker compose up --build -d --wait api
+      - name: Vérifier l'API
+        run: |
+          curl -fsS http://localhost:8000/health
+          curl -fsS http://localhost:8000/stats
+      - name: Logs en cas d'échec
+        if: failure()
+        run: docker compose logs
+      - name: Arrêt
+        if: always()
+        run: docker compose down -v
