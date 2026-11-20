@@ -7,9 +7,9 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 
 SEED = 42
-IDENTITY_COL = "identity"      # <- à adapter si besoin
-LABEL_COL = "label"            # <- 0 = normal, 1 = attaque
-SCENARIO_COL = "scenario"      # <- "normal", "privilege_escalation", ...
+IDENTITY_COL = "identity"
+LABEL_COL = "is_attack"        # 0 = normal, 1 = attaque
+SCENARIO_COL = "scenario"
 UNSEEN_SCENARIO = "access_key_persistence"
 
 
@@ -33,7 +33,10 @@ def split_by_identity(
     """
     unseen_ids = set(df.loc[df[SCENARIO_COL] == unseen_scenario, IDENTITY_COL])
     if not unseen_ids:
-        raise ValueError(f"Scénario '{unseen_scenario}' absent des données.")
+        available = sorted(df[SCENARIO_COL].unique())
+        raise ValueError(
+            f"Scénario '{unseen_scenario}' absent des données. Disponibles : {available}"
+        )
 
     rest = df[~df[IDENTITY_COL].isin(unseen_ids)]
     ids = (

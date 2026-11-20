@@ -29,3 +29,6 @@ Thumbs.db
 data/generated_*/
 
 models/
+
+.venv-ci/
+data/output/
