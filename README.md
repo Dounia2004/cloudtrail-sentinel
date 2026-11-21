@@ -101,6 +101,20 @@ Détails et matrices de confusion : [docs/evaluation.md](docs/evaluation.md).
 règles sont optimistes. Les données sont synthétiques et le test ne contient que 57 fenêtres
 d'attaque.
 
+### Validation sur logs réels (flaws.cloud)
+
+Échantillon de 50 000 événements réels et anonymisés (les 2 500 premiers de chacun des 20 fichiers
+du jeu public de Summit Route, 2017-2020). Ces logs ne sont **pas étiquetés** : il s'agit d'un
+contrôle de robustesse, pas d'une mesure de precision ni de recall ([docs/public_data.md](docs/public_data.md)).
+
+- 100 % des événements sont acceptés par l'ingestion (0 rejeté).
+- Les règles `IAM-002`, `IAM-003` et `AUTH-004`, sans scénario dans le générateur, se déclenchent
+  sur ces logs : elles sont donc exercées sur des données qui ne sont pas les nôtres.
+- `AUTH-004` (activité du compte root) produit 2 472 des 2 684 alertes, soit 92 % : il faudrait
+  regrouper ces alertes pour ne pas noyer l'analyste.
+- 72 % des événements sont des `RunInstances`, et aucune règle ne couvre le lancement massif
+  d'instances (minage, technique T1496) : piste d'amélioration.
+
 ## Reproduire les résultats
 
 ```bash
@@ -108,6 +122,9 @@ python scripts/generate_data.py --extended --seed 7 --attack-repeats 10 --out da
 python -m src.detection.ml.features --out data/generated_ml/features.csv
 python -m src.evaluation.compare --unseen persistence_access_key --out docs/evaluation.md
 python -m src.scoring.scoring --unseen persistence_access_key --ml-threshold 85
+# Contrôle sur logs réels (télécharge 250 Mo dans data/public/, ignoré par Git)
+python scripts/download_public_data.py
+python -m src.evaluation.public_check --out docs/public_data.md
 ```
 
 ## Qualité et sécurité
@@ -124,7 +141,8 @@ python -m src.scoring.scoring --unseen persistence_access_key --ml-threshold 85
 ## Limites
 
 - Données synthétiques : un modèle simplifié de la réalité, résultats à interpréter avec prudence.
-- Les datasets publics (flaws.cloud) ne sont pas encore intégrés à l'évaluation.
+- Les logs publics de flaws.cloud ne sont pas étiquetés : ils servent à contrôler la robustesse,
+  pas à mesurer precision et recall. Ils sont téléchargés à la demande et jamais redistribués.
 - Une seule graine d'évaluation, pas de validation croisée.
 - Pas d'ingestion en continu depuis un compte AWS réel ni de remédiation automatique (hors périmètre).
 - L'agent d'investigation LLM (optionnel) n'est pas implémenté.
